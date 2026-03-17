@@ -193,8 +193,8 @@ POST   /api/alerts/run-ai/            Trigger AI evaluation (Admin)
 
 ## 👨‍💻 Developed By
 
-- **Anjani Vishwakarma** (2303600130014)
-- **Vinayak Shukla** (2303600139008)
+- **Anjani Vishwakarma**
+- **Vinayak Shukla**
 
 **Supervisor:** Mrs. Anika Bisht, Assistant Professor  
 **Department:** Information Technology  
