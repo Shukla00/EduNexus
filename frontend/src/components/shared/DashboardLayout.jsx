@@ -14,7 +14,7 @@ const NAV_CONFIG = {
     { icon: Users, label: 'Students', to: '/admin/students' },
     { icon: UserCircle, label: 'Faculty', to: '/admin/faculty' },
     { icon: Building2, label: 'Departments', to: '/admin/departments' },
-    { icon: BookOpen, label: 'Courses', to: '/admin/courses' },
+    { icon: BookOpen, label: 'Subjects', to: '/admin/courses' },
     { icon: CalendarDays, label: 'Timetable', to: '/admin/timetable' },
     { icon: Brain, label: 'AI Alerts', to: '/admin/alerts', badge: true },
     { icon: UserCircle, label: 'Profile', to: '/admin/profile' },

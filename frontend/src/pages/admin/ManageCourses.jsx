@@ -1,26 +1,52 @@
 import { useState, useEffect } from 'react'
-import { studentsApi, departmentsApi } from '../../services/api'
+import { studentsApi, departmentsApi, facultyApi } from '../../services/api'
 import { Plus, Search, Trash2, Edit } from 'lucide-react'
+import ConfirmModal from '../../components/ConfirmModal'
 import toast from 'react-hot-toast'
 
 export default function ManageCourses() {
   const [courses, setCourses] = useState([])
   const [departments, setDepartments] = useState([])
+  const [facultyData, setFacultyData] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filters, setFilters] = useState({ department: '', semester: '' })
   const [showAddModal, setShowAddModal] = useState(false)
-  const [form, setForm] = useState({ name: '', code: '', department: '', credits: 4, semester: 1, description: '' })
+  const [editingId, setEditingId] = useState(null)
+  const defaultForm = { name: '', code: '', department: '', credits: 4, semester: 1, description: '', faculty: '' }
+  const [form, setForm] = useState(defaultForm)
   const [submitting, setSubmitting] = useState(false)
+  const [deleteId, setDeleteId] = useState(null)
+
+  const openAdd = () => {
+    setEditingId(null)
+    setForm(defaultForm)
+    setShowAddModal(true)
+  }
+
+  const openEdit = (c) => {
+    setEditingId(c.id)
+    setForm({
+      name: c.name || '',
+      code: c.code || '',
+      department: c.department || '',
+      credits: c.credits || 4,
+      semester: c.semester || 1,
+      description: c.description || '',
+      faculty: c.faculty_id || ''
+    })
+    setShowAddModal(true)
+  }
 
   const load = async () => {
     setLoading(true)
     try {
       const params = { ...filters }
       if (search) params.search = search
-      const [crsRes, deptRes] = await Promise.all([studentsApi.courses(params), departmentsApi.list()])
+      const [crsRes, deptRes, facRes] = await Promise.all([studentsApi.courses(params), departmentsApi.list(), facultyApi.list()])
       setCourses(crsRes.data.results || crsRes.data)
       setDepartments(deptRes.data.results || deptRes.data)
+      setFacultyData(facRes.data.results || facRes.data)
     } catch {
       toast.error('Failed to load courses')
     } finally {
@@ -34,31 +60,37 @@ export default function ManageCourses() {
     return () => clearTimeout(t)
   }, [search])
 
-  const addCourse = async (e) => {
+  const saveCourse = async (e) => {
     e.preventDefault()
     setSubmitting(true)
     try {
-      await studentsApi.createCourse(form)
-      toast.success('Course added successfully')
+      if (editingId) {
+        await studentsApi.updateCourse(editingId, form)
+        toast.success('Subject updated successfully')
+      } else {
+        await studentsApi.createCourse(form)
+        toast.success('Subject added successfully')
+      }
       setShowAddModal(false)
-      setForm({ name: '', code: '', department: '', credits: 4, semester: 1, description: '' })
       load()
     } catch (err) {
-      const msg = Object.values(err?.response?.data || {}).flat()[0] || 'Failed to add course'
+      const msg = Object.values(err?.response?.data || {}).flat()[0] || 'Failed to save subject'
       toast.error(msg)
     } finally {
       setSubmitting(false)
     }
   }
 
-  const deleteCourse = async (id) => {
-    if (!confirm('Delete this course? All associated data will be removed.')) return
+  const deleteCourse = async () => {
+    if (!deleteId) return
     try {
-      await studentsApi.deleteCourse(id)
-      toast.success('Course deleted')
+      await studentsApi.deleteCourse(deleteId)
+      toast.success('Subject deleted')
       load()
     } catch {
-      toast.error('Failed to delete course')
+      toast.error('Failed to delete subject')
+    } finally {
+      setDeleteId(null)
     }
   }
 
@@ -66,11 +98,11 @@ export default function ManageCourses() {
     <div className="space-y-5 animate-fade-in">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="page-title">Manage Courses</h1>
-          <p className="page-subtitle">{courses.length} courses offered</p>
+          <h1 className="page-title">Manage Subjects</h1>
+          <p className="page-subtitle">{courses.length} subjects offered</p>
         </div>
-        <button className="btn-primary" onClick={() => setShowAddModal(true)}>
-          <Plus className="w-4 h-4" /> Add Course
+        <button className="btn-primary" onClick={openAdd}>
+          <Plus className="w-4 h-4" /> Add Subject
         </button>
       </div>
 
@@ -102,8 +134,9 @@ export default function ManageCourses() {
             <thead>
               <tr>
                 <th>Code</th>
-                <th>Course Name</th>
+                <th>Subject Name</th>
                 <th>Department</th>
+                <th>Faculty</th>
                 <th>Semester</th>
                 <th>Credits</th>
                 <th>Actions</th>
@@ -111,18 +144,19 @@ export default function ManageCourses() {
             </thead>
             <tbody>
               {courses.length === 0 ? (
-                <tr><td colSpan={6} className="text-center py-12 text-slate-400">No courses found</td></tr>
+                <tr><td colSpan={6} className="text-center py-12 text-slate-400">No subjects found</td></tr>
               ) : courses.map(c => (
                 <tr key={c.id}>
                   <td className="font-mono font-medium text-slate-900">{c.code}</td>
                   <td className="font-medium text-slate-900">{c.name}</td>
                   <td>{c.department_name || departments.find(d => d.id === c.department)?.name || 'Unknown'}</td>
+                  <td>{c.faculty_name || <span className="text-slate-400 italic">Unassigned</span>}</td>
                   <td>Sem {c.semester}</td>
                   <td>{c.credits}</td>
                   <td>
                     <div className="flex items-center gap-1">
-                      <button className="btn-ghost btn-sm p-1.5" title="Edit"><Edit className="w-3.5 h-3.5" /></button>
-                      <button onClick={() => deleteCourse(c.id)} className="btn-ghost btn-sm p-1.5 text-red-500 hover:bg-red-50" title="Delete">
+                      <button onClick={() => openEdit(c)} className="btn-ghost btn-sm p-1.5" title="Edit"><Edit className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => setDeleteId(c.id)} className="btn-ghost btn-sm p-1.5 text-red-500 hover:bg-red-50" title="Delete">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -138,16 +172,16 @@ export default function ManageCourses() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-slide-up">
             <div className="p-6 border-b border-surface-100">
-              <h2 className="text-xl font-bold font-display text-slate-900">Add Course</h2>
+              <h2 className="text-xl font-bold font-display text-slate-900">{editingId ? 'Edit Subject' : 'Add Subject'}</h2>
             </div>
-            <form onSubmit={addCourse} className="p-6 space-y-4">
+            <form onSubmit={saveCourse} className="p-6 space-y-4">
               <div className="grid grid-cols-3 gap-4">
                 <div className="col-span-2">
-                  <label className="label">Course Name</label>
+                  <label className="label">Subject Name</label>
                   <input className="input" required value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Data Structures" />
                 </div>
                 <div>
-                  <label className="label">Course Code</label>
+                  <label className="label">Subject Code</label>
                   <input className="input font-mono uppercase" required value={form.code} onChange={e => setForm(p => ({ ...p, code: e.target.value.toUpperCase() }))} placeholder="e.g. CS201" />
                 </div>
               </div>
@@ -166,9 +200,20 @@ export default function ManageCourses() {
                   </select>
                 </div>
               </div>
-              <div>
-                <label className="label">Credits</label>
-                <input type="number" className="input" min="1" max="6" required value={form.credits} onChange={e => setForm(p => ({ ...p, credits: parseInt(e.target.value) }))} />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Credits</label>
+                  <input type="number" className="input" min="1" max="6" required value={form.credits} onChange={e => setForm(p => ({ ...p, credits: parseInt(e.target.value) }))} />
+                </div>
+                <div>
+                  <label className="label">Faculty Assigned</label>
+                  <select className="input" value={form.faculty} onChange={e => setForm(p => ({ ...p, faculty: e.target.value }))} disabled={!form.department}>
+                    <option value="">{form.department ? "Select Faculty" : "Select Dept First"}</option>
+                    {facultyData.filter(f => f.department === parseInt(form.department)).map(f => (
+                      <option key={f.id} value={f.id}>{f.full_name}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
               <div>
                 <label className="label">Description</label>
@@ -177,13 +222,20 @@ export default function ManageCourses() {
               <div className="flex gap-3 pt-2">
                 <button type="button" className="btn-secondary flex-1" onClick={() => setShowAddModal(false)}>Cancel</button>
                 <button type="submit" className="btn-primary flex-1" disabled={submitting}>
-                  {submitting ? 'Adding...' : 'Add Course'}
+                  {submitting ? 'Saving...' : (editingId ? 'Save Changes' : 'Add Subject')}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+      <ConfirmModal
+        isOpen={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        onConfirm={deleteCourse}
+        title="Delete Subject"
+        message="Are you sure you want to delete this subject? All associated data will be removed."
+      />
     </div>
   )
 }

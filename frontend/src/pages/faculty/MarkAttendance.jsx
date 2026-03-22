@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { attendanceApi, studentsApi, timetableApi } from '../../services/api'
+import { useState, useEffect, useRef } from 'react'
+import { attendanceApi, studentsApi, facultyApi } from '../../services/api'
 import { CheckCircle, XCircle, Clock, Save, Plus, Users } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -23,21 +23,25 @@ export default function MarkAttendance() {
   const [step, setStep] = useState(1) // 1=setup, 2=mark
 
   useEffect(() => {
-    timetableApi.my().then(({ data }) => {
-      const uniqueCourses = []
-      const seen = new Set()
-      ;(data.results || data).forEach(e => {
-        if (!seen.has(e.course)) {
-          seen.add(e.course)
-          uniqueCourses.push({ id: e.course, name: e.course_name, code: e.course_code })
-        }
-      })
-      setCourses(uniqueCourses)
-    }).catch(() => {})
+    const fetchCourses = async () => {
+      try {
+        const [profileRes, coursesRes] = await Promise.all([
+          facultyApi.me(),
+          studentsApi.courses()
+        ])
+        const assignedIds = profileRes.data.courses_assigned || []
+        const allCourses = coursesRes.data.results || coursesRes.data
+        const myCourses = allCourses.filter(c => assignedIds.includes(c.id))
+        setCourses(myCourses)
+      } catch (err) {
+        console.error('Failed to load courses', err)
+      }
+    }
+    fetchCourses()
   }, [])
 
   const loadStudents = async () => {
-    if (!selectedCourse) return toast.error('Select a course first')
+    if (!selectedCourse) return toast.error('Select a subject first')
     try {
       const { data } = await studentsApi.list({ semester: 5 })
       const list = data.results || data
@@ -65,6 +69,8 @@ export default function MarkAttendance() {
     students.forEach(s => { updated[s.id] = status })
     setAttendance(updated)
   }
+
+
 
   const saveAttendance = async () => {
     setSaving(true)
@@ -111,9 +117,9 @@ export default function MarkAttendance() {
           <h2 className="font-semibold text-slate-900 font-display mb-4">Session Setup</h2>
           <div className="space-y-4">
             <div>
-              <label className="label">Course</label>
+              <label className="label">Subject</label>
               <select className="input" value={selectedCourse} onChange={e => setSelectedCourse(e.target.value)}>
-                <option value="">Select course...</option>
+                <option value="">Select subject...</option>
                 {courses.map(c => (
                   <option key={c.id} value={c.id}>{c.code} - {c.name}</option>
                 ))}
@@ -157,16 +163,19 @@ export default function MarkAttendance() {
           </div>
 
           {/* Quick actions */}
-          <div className="flex gap-2 flex-wrap">
-            <button className="btn-secondary btn-sm" onClick={() => markAll('PRESENT')}>
-              <CheckCircle className="w-3.5 h-3.5 text-emerald-600" /> Mark All Present
-            </button>
-            <button className="btn-secondary btn-sm" onClick={() => markAll('ABSENT')}>
-              <XCircle className="w-3.5 h-3.5 text-red-600" /> Mark All Absent
-            </button>
-            <span className="text-sm text-slate-500 flex items-center ml-2">
-              Click student to toggle: Present → Absent → Late
-            </span>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex gap-2 flex-wrap">
+              <button className="btn-secondary btn-sm" onClick={() => markAll('PRESENT')}>
+                <CheckCircle className="w-3.5 h-3.5 text-emerald-600" /> Mark All Present
+              </button>
+              <button className="btn-secondary btn-sm" onClick={() => markAll('ABSENT')}>
+                <XCircle className="w-3.5 h-3.5 text-red-600" /> Mark All Absent
+              </button>
+              <span className="text-sm text-slate-500 hidden md:flex items-center ml-2">
+                Click student to toggle status
+              </span>
+            </div>
+
           </div>
 
           {/* Student Grid */}

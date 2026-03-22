@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { studentsApi, departmentsApi } from '../../services/api'
 import { Plus, Search, Filter, Trash2, Edit, Eye, AlertTriangle } from 'lucide-react'
+import ConfirmModal from '../../components/ConfirmModal'
 import toast from 'react-hot-toast'
 
 const RISK_BADGE = {
@@ -16,8 +17,30 @@ export default function ManageStudents() {
   const [search, setSearch] = useState('')
   const [filters, setFilters] = useState({ department: '', semester: '', risk_level: '' })
   const [showAddModal, setShowAddModal] = useState(false)
-  const [form, setForm] = useState({ email: '', first_name: '', last_name: '', enrollment_number: '', department: '', semester: 1 })
+  const [editingId, setEditingId] = useState(null)
+  const defaultForm = { email: '', first_name: '', last_name: '', enrollment_number: '', department: '', semester: 1 }
+  const [form, setForm] = useState(defaultForm)
   const [submitting, setSubmitting] = useState(false)
+  const [deleteId, setDeleteId] = useState(null)
+
+  const openAdd = () => {
+    setEditingId(null)
+    setForm(defaultForm)
+    setShowAddModal(true)
+  }
+
+  const openEdit = (s) => {
+    setEditingId(s.id)
+    setForm({
+      email: s.email || '',
+      first_name: s.first_name || '',
+      last_name: s.last_name || '',
+      enrollment_number: s.enrollment_number || '',
+      department: s.department || '',
+      semester: s.semester || 1
+    })
+    setShowAddModal(true)
+  }
 
   const load = async () => {
     setLoading(true)
@@ -40,31 +63,37 @@ export default function ManageStudents() {
     return () => clearTimeout(t)
   }, [search])
 
-  const addStudent = async (e) => {
+  const saveStudent = async (e) => {
     e.preventDefault()
     setSubmitting(true)
     try {
-      await studentsApi.create(form)
-      toast.success('Student added successfully')
+      if (editingId) {
+        await studentsApi.update(editingId, form)
+        toast.success('Student updated successfully')
+      } else {
+        await studentsApi.create(form)
+        toast.success('Student added successfully')
+      }
       setShowAddModal(false)
-      setForm({ email: '', first_name: '', last_name: '', enrollment_number: '', department: '', semester: 1 })
       load()
     } catch (err) {
-      const msg = Object.values(err?.response?.data || {}).flat()[0] || 'Failed to add student'
+      const msg = Object.values(err?.response?.data || {}).flat()[0] || 'Failed to save student'
       toast.error(msg)
     } finally {
       setSubmitting(false)
     }
   }
 
-  const deleteStudent = async (id) => {
-    if (!confirm('Delete this student?')) return
+  const deleteStudent = async () => {
+    if (!deleteId) return
     try {
-      await studentsApi.delete(id)
+      await studentsApi.delete(deleteId)
       toast.success('Student deleted')
       load()
     } catch {
       toast.error('Failed to delete student')
+    } finally {
+      setDeleteId(null)
     }
   }
 
@@ -75,7 +104,7 @@ export default function ManageStudents() {
           <h1 className="page-title">Manage Students</h1>
           <p className="page-subtitle">{students.length} students enrolled</p>
         </div>
-        <button className="btn-primary" onClick={() => setShowAddModal(true)}>
+        <button className="btn-primary" onClick={openAdd}>
           <Plus className="w-4 h-4" /> Add Student
         </button>
       </div>
@@ -167,8 +196,8 @@ export default function ManageStudents() {
                   <td>
                     <div className="flex items-center gap-1">
                       <button className="btn-ghost btn-sm p-1.5" title="View"><Eye className="w-3.5 h-3.5" /></button>
-                      <button className="btn-ghost btn-sm p-1.5" title="Edit"><Edit className="w-3.5 h-3.5" /></button>
-                      <button className="btn-ghost btn-sm p-1.5 text-red-500 hover:bg-red-50" title="Delete" onClick={() => deleteStudent(s.id)}>
+                      <button onClick={() => openEdit(s)} className="btn-ghost btn-sm p-1.5" title="Edit"><Edit className="w-3.5 h-3.5" /></button>
+                      <button className="btn-ghost btn-sm p-1.5 text-red-500 hover:bg-red-50" title="Delete" onClick={() => setDeleteId(s.id)}>
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -185,9 +214,9 @@ export default function ManageStudents() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-slide-up">
             <div className="p-6 border-b border-surface-100">
-              <h2 className="text-xl font-bold font-display text-slate-900">Add New Student</h2>
+              <h2 className="text-xl font-bold font-display text-slate-900">{editingId ? 'Edit Student' : 'Add New Student'}</h2>
             </div>
-            <form onSubmit={addStudent} className="p-6 space-y-4">
+            <form onSubmit={saveStudent} className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="label">First Name</label>
@@ -221,17 +250,24 @@ export default function ManageStudents() {
                   </select>
                 </div>
               </div>
-              <p className="text-xs text-slate-400">Default password: student@123 (student can change later)</p>
+              {!editingId && <p className="text-xs text-slate-400">Default password: Student@123 (student can change later)</p>}
               <div className="flex gap-3 pt-2">
                 <button type="button" className="btn-secondary flex-1" onClick={() => setShowAddModal(false)}>Cancel</button>
                 <button type="submit" className="btn-primary flex-1" disabled={submitting}>
-                  {submitting ? 'Adding...' : 'Add Student'}
+                  {submitting ? 'Saving...' : (editingId ? 'Save Changes' : 'Add Student')}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+      <ConfirmModal
+        isOpen={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        onConfirm={deleteStudent}
+        title="Delete Student"
+        message="Are you sure you want to delete this student? All their records will be removed."
+      />
     </div>
   )
 }

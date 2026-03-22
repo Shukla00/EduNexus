@@ -97,6 +97,7 @@ export const attendanceApi = {
   mySummary: () => api.get('/attendance/summary/'),
   studentSummary: (id) => api.get(`/attendance/summary/${id}/`),
   stats: (params) => api.get('/attendance/stats/', { params }),
+  uploadSheet: (formData) => api.post('/attendance/ocr/', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
 }
 
 // ===== Marks =====

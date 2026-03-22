@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { facultyApi, departmentsApi } from '../../services/api'
+import { facultyApi, departmentsApi, studentsApi } from '../../services/api'
 import { Plus, Search, Trash2, Edit } from 'lucide-react'
+import ConfirmModal from '../../components/ConfirmModal'
 import toast from 'react-hot-toast'
 
 export default function ManageFaculty() {
@@ -10,12 +11,32 @@ export default function ManageFaculty() {
   const [search, setSearch] = useState('')
   const [filters, setFilters] = useState({ department: '' })
   const [showAddModal, setShowAddModal] = useState(false)
-  const [form, setForm] = useState({ 
-    email: '', first_name: '', last_name: '', employee_id: '', 
-    department: '', designation: 'Assistant Professor', 
-    specialization: '', experience_years: 0 
-  })
+  const [editingId, setEditingId] = useState(null)
+  const defaultForm = { email: '', first_name: '', last_name: '', employee_id: '', department: '', designation: 'Assistant Professor', specialization: '', experience_years: 0 }
+  const [form, setForm] = useState(defaultForm)
   const [submitting, setSubmitting] = useState(false)
+  const [deleteId, setDeleteId] = useState(null)
+
+  const openAdd = () => {
+    setEditingId(null)
+    setForm(defaultForm)
+    setShowAddModal(true)
+  }
+
+  const openEdit = (f) => {
+    setEditingId(f.id)
+    setForm({
+      email: f.email || '',
+      first_name: f.first_name || '',
+      last_name: f.last_name || '',
+      employee_id: f.employee_id || '',
+      department: f.department || '',
+      designation: f.designation || 'Assistant Professor',
+      specialization: f.specialization || '',
+      experience_years: f.experience_years || 0
+    })
+    setShowAddModal(true)
+  }
 
   const load = async () => {
     setLoading(true)
@@ -38,35 +59,37 @@ export default function ManageFaculty() {
     return () => clearTimeout(t)
   }, [search])
 
-  const addFaculty = async (e) => {
+  const saveFaculty = async (e) => {
     e.preventDefault()
     setSubmitting(true)
     try {
-      await facultyApi.create(form)
-      toast.success('Faculty added successfully')
+      if (editingId) {
+        await facultyApi.update(editingId, form)
+        toast.success('Faculty updated successfully')
+      } else {
+        await facultyApi.create(form)
+        toast.success('Faculty added successfully')
+      }
       setShowAddModal(false)
-      setForm({ 
-        email: '', first_name: '', last_name: '', employee_id: '', 
-        department: '', designation: 'Assistant Professor', 
-        specialization: '', experience_years: 0 
-      })
       load()
     } catch (err) {
-      const msg = Object.values(err?.response?.data || {}).flat()[0] || 'Failed to add faculty'
+      const msg = Object.values(err?.response?.data || {}).flat()[0] || 'Failed to save faculty'
       toast.error(msg)
     } finally {
       setSubmitting(false)
     }
   }
 
-  const deleteFaculty = async (id) => {
-    if (!confirm('Delete this faculty member?')) return
+  const deleteFaculty = async () => {
+    if (!deleteId) return
     try {
-      await facultyApi.delete(id)
+      await facultyApi.delete(deleteId)
       toast.success('Faculty deleted')
       load()
     } catch {
       toast.error('Failed to delete faculty')
+    } finally {
+      setDeleteId(null)
     }
   }
 
@@ -77,7 +100,7 @@ export default function ManageFaculty() {
           <h1 className="page-title">Manage Faculty</h1>
           <p className="page-subtitle">{faculty.length} staff members</p>
         </div>
-        <button className="btn-primary" onClick={() => setShowAddModal(true)}>
+        <button className="btn-primary" onClick={openAdd}>
           <Plus className="w-4 h-4" /> Add Faculty
         </button>
       </div>
@@ -137,8 +160,8 @@ export default function ManageFaculty() {
                   <td>{f.experience_years}</td>
                   <td>
                     <div className="flex items-center gap-1">
-                      <button className="btn-ghost btn-sm p-1.5" title="Edit"><Edit className="w-3.5 h-3.5" /></button>
-                      <button onClick={() => deleteFaculty(f.id)} className="btn-ghost btn-sm p-1.5 text-red-500 hover:bg-red-50" title="Delete">
+                      <button onClick={() => openEdit(f)} className="btn-ghost btn-sm p-1.5" title="Edit"><Edit className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => setDeleteId(f.id)} className="btn-ghost btn-sm p-1.5 text-red-500 hover:bg-red-50" title="Delete">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -154,9 +177,9 @@ export default function ManageFaculty() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl animate-slide-up">
             <div className="p-6 border-b border-surface-100">
-              <h2 className="text-xl font-bold font-display text-slate-900">Add Faculty</h2>
+              <h2 className="text-xl font-bold font-display text-slate-900">{editingId ? 'Edit Faculty' : 'Add Faculty'}</h2>
             </div>
-            <form onSubmit={addFaculty} className="p-6 space-y-4">
+            <form onSubmit={saveFaculty} className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="label">First Name</label>
@@ -205,17 +228,25 @@ export default function ManageFaculty() {
                   <input type="number" className="input" min="0" required value={form.experience_years} onChange={e => setForm(p => ({ ...p, experience_years: parseInt(e.target.value) }))} />
                 </div>
               </div>
-              <p className="text-xs text-slate-400">Default password: faculty@123</p>
+
+              {!editingId && <p className="text-xs text-slate-400">Default password: Faculty@123</p>}
               <div className="flex gap-3 pt-2">
                 <button type="button" className="btn-secondary flex-1" onClick={() => setShowAddModal(false)}>Cancel</button>
                 <button type="submit" className="btn-primary flex-1" disabled={submitting}>
-                  {submitting ? 'Adding...' : 'Add Faculty'}
+                  {submitting ? 'Saving...' : (editingId ? 'Save Changes' : 'Add Faculty')}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+      <ConfirmModal
+        isOpen={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        onConfirm={deleteFaculty}
+        title="Delete Faculty Member"
+        message="Are you sure you want to delete this faculty member? All their assigned records may be affected."
+      />
     </div>
   )
 }

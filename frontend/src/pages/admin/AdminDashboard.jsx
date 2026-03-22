@@ -4,29 +4,7 @@ import { Users, GraduationCap, Building2, AlertTriangle, Brain, TrendingUp, Acti
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import toast from 'react-hot-toast'
 
-const ATTENDANCE_TREND = [
-  { month: 'Aug', attendance: 88 },
-  { month: 'Sep', attendance: 84 },
-  { month: 'Oct', attendance: 79 },
-  { month: 'Nov', attendance: 82 },
-  { month: 'Dec', attendance: 75 },
-  { month: 'Jan', attendance: 80 },
-]
 
-const MARKS_DIST = [
-  { grade: 'A+', count: 45, color: '#10b981' },
-  { grade: 'A', count: 82, color: '#3b82f6' },
-  { grade: 'B+', count: 95, color: '#8b5cf6' },
-  { grade: 'B', count: 73, color: '#f59e0b' },
-  { grade: 'C', count: 41, color: '#f97316' },
-  { grade: 'F', count: 18, color: '#ef4444' },
-]
-
-const RISK_DATA = [
-  { name: 'Low Risk', value: 65, color: '#10b981' },
-  { name: 'Medium Risk', value: 25, color: '#f59e0b' },
-  { name: 'High Risk', value: 10, color: '#ef4444' },
-]
 
 function StatCard({ icon: Icon, label, value, color, change }) {
   return (
@@ -86,6 +64,13 @@ export default function AdminDashboard() {
     </div>
   )
 
+  const totalRisk = alertStats ? alertStats.low + alertStats.medium + alertStats.high : 0;
+  const riskData = alertStats ? [
+    { name: 'Low Risk', value: alertStats.low, pct: totalRisk ? Math.round(alertStats.low/totalRisk*100) : 0, color: '#10b981' },
+    { name: 'Medium Risk', value: alertStats.medium, pct: totalRisk ? Math.round(alertStats.medium/totalRisk*100) : 0, color: '#f59e0b' },
+    { name: 'High Risk', value: alertStats.high, pct: totalRisk ? Math.round(alertStats.high/totalRisk*100) : 0, color: '#ef4444' },
+  ] : []
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
@@ -106,10 +91,10 @@ export default function AdminDashboard() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <StatCard icon={Users} label="Total Students" value={stats?.total_students} color="bg-blue-600" change={2.4} />
-        <StatCard icon={GraduationCap} label="Total Faculty" value={stats?.total_faculty} color="bg-emerald-600" change={0} />
+        <StatCard icon={Users} label="Total Students" value={stats?.total_students} color="bg-blue-600" />
+        <StatCard icon={GraduationCap} label="Total Faculty" value={stats?.total_faculty} color="bg-emerald-600" />
         <StatCard icon={Building2} label="Departments" value={stats?.total_departments} color="bg-violet-600" />
-        <StatCard icon={AlertTriangle} label="Active AI Alerts" value={stats?.active_alerts} color="bg-amber-500" change={-5} />
+        <StatCard icon={AlertTriangle} label="Active AI Alerts" value={stats?.active_alerts} color="bg-amber-500" />
       </div>
 
       {/* Alert Risk Summary */}
@@ -142,7 +127,7 @@ export default function AdminDashboard() {
             <div className="ai-badge"><Brain className="w-3 h-3" /> AI Monitored</div>
           </div>
           <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={ATTENDANCE_TREND}>
+            <LineChart data={stats?.attendance_trend || []}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
               <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} domain={[60, 100]} />
@@ -162,7 +147,7 @@ export default function AdminDashboard() {
             <p className="text-xs text-slate-500">Across all courses this semester</p>
           </div>
           <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={MARKS_DIST} barSize={28}>
+            <BarChart data={stats?.marks_dist || []} barSize={28}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
               <XAxis dataKey="grade" tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
@@ -170,7 +155,7 @@ export default function AdminDashboard() {
                 contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '13px' }}
               />
               <Bar dataKey="count" radius={[6, 6, 0, 0]}>
-                {MARKS_DIST.map((entry, i) => (
+                {(stats?.marks_dist || []).map((entry, i) => (
                   <Cell key={i} fill={entry.color} />
                 ))}
               </Bar>
@@ -187,19 +172,19 @@ export default function AdminDashboard() {
           <div className="flex items-center gap-6">
             <ResponsiveContainer width="60%" height={180}>
               <PieChart>
-                <Pie data={RISK_DATA} cx="50%" cy="50%" innerRadius={50} outerRadius={80} dataKey="value" paddingAngle={3}>
-                  {RISK_DATA.map((entry, i) => (
+                <Pie data={riskData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} dataKey="value" paddingAngle={3}>
+                  {riskData.map((entry, i) => (
                     <Cell key={i} fill={entry.color} />
                   ))}
                 </Pie>
               </PieChart>
             </ResponsiveContainer>
             <div className="space-y-3">
-              {RISK_DATA.map(item => (
+              {riskData.map(item => (
                 <div key={item.name} className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
                   <span className="text-sm text-slate-600">{item.name}</span>
-                  <span className="text-sm font-bold text-slate-900 ml-auto">{item.value}%</span>
+                  <span className="text-sm font-bold text-slate-900 ml-auto">{item.pct}%</span>
                 </div>
               ))}
             </div>

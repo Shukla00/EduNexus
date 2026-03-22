@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { timetableApi, departmentsApi, studentsApi, facultyApi } from '../../services/api'
 import { Plus, Trash2, Calendar } from 'lucide-react'
+import ConfirmModal from '../../components/ConfirmModal'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../context/AuthContext'
 
@@ -24,6 +25,7 @@ export default function ManageTimetable() {
     semester: 1, department: '', academic_year: '2024-2025'
   })
   const [submitting, setSubmitting] = useState(false)
+  const [deleteId, setDeleteId] = useState(null)
 
   useEffect(() => {
     Promise.all([departmentsApi.list(), timetableApi.slots()])
@@ -74,14 +76,16 @@ export default function ManageTimetable() {
     }
   }
 
-  const deleteEntry = async (id) => {
-    if (!confirm('Delete this entry?')) return
+  const deleteEntry = async () => {
+    if (!deleteId) return
     try {
-      await timetableApi.delete(id)
+      await timetableApi.delete(deleteId)
       toast.success('Entry deleted')
       loadTimetable()
     } catch {
       toast.error('Failed to delete')
+    } finally {
+      setDeleteId(null)
     }
   }
 
@@ -135,7 +139,7 @@ export default function ManageTimetable() {
                             <p className="font-bold text-green-900">{entry.course_code}</p>
                             <p className="text-green-700">{entry.faculty_name}</p>
                             <p className="text-green-600 italic">{entry.room}</p>
-                            <button onClick={() => deleteEntry(entry.id)} className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 bg-white/80 rounded-full p-0.5 shadow-sm">
+                            <button onClick={() => setDeleteId(entry.id)} className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 bg-white/80 rounded-full p-0.5 shadow-sm">
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
@@ -158,7 +162,7 @@ export default function ManageTimetable() {
             <div className="p-5 border-b border-surface-100"><h2 className="text-lg font-bold">Add Timetable Entry</h2></div>
             <form onSubmit={addEntry} className="p-5 space-y-4">
               <div>
-                <label className="label">Course</label>
+                <label className="label">Subject</label>
                 <select className="input" required value={form.course} onChange={e => setForm(p => ({...p, course: e.target.value}))}>
                   <option value="">Select...</option>
                   {courses.map(c => <option key={c.id} value={c.id}>{c.code} - {c.name}</option>)}
@@ -190,6 +194,13 @@ export default function ManageTimetable() {
           </div>
         </div>
       )}
+      <ConfirmModal
+        isOpen={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        onConfirm={deleteEntry}
+        title="Delete Timetable Entry"
+        message="Are you sure you want to delete this timetable entry?"
+      />
     </div>
   )
 }

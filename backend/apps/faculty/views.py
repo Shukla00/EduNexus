@@ -20,18 +20,24 @@ class FacultyProfileSerializer(serializers.ModelSerializer):
         ]
 
 
+from apps.students.models import Course
+
 class FacultyCreateSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(write_only=True)
     first_name = serializers.CharField(write_only=True)
     last_name = serializers.CharField(write_only=True)
-    password = serializers.CharField(write_only=True, default='faculty@123')
+    password = serializers.CharField(write_only=True, default='Faculty@123')
+    courses_assigned = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=Course.objects.all(), required=False
+    )
+    password = serializers.CharField(write_only=True, default='Faculty@123')
 
     class Meta:
         model = FacultyProfile
         fields = [
             'email', 'first_name', 'last_name', 'password',
             'employee_id', 'department', 'designation', 'specialization',
-            'date_of_joining', 'qualification', 'experience_years'
+            'courses_assigned', 'date_of_joining', 'qualification', 'experience_years'
         ]
 
     def create(self, validated_data):
@@ -39,13 +45,17 @@ class FacultyCreateSerializer(serializers.ModelSerializer):
         email = validated_data.pop('email')
         first_name = validated_data.pop('first_name')
         last_name = validated_data.pop('last_name')
-        password = validated_data.pop('password', 'faculty@123')
+        password = validated_data.pop('password', 'Faculty@123')
+        courses_assigned = validated_data.pop('courses_assigned', [])
 
         user = User.objects.create_user(
             email=email, first_name=first_name, last_name=last_name,
             password=password, role='FACULTY', department=validated_data.get('department')
         )
-        return FacultyProfile.objects.create(user=user, **validated_data)
+        profile = FacultyProfile.objects.create(user=user, **validated_data)
+        if courses_assigned:
+            profile.courses_assigned.set(courses_assigned)
+        return profile
 
 
 class FacultyListCreateView(generics.ListCreateAPIView):

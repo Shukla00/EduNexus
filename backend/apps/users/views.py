@@ -98,17 +98,55 @@ class DashboardStatsView(APIView):
     def get(self, request):
         from apps.students.models import Student
         from apps.faculty.models import FacultyProfile
-        from apps.attendance.models import AttendanceRecord
+        from apps.attendance.models import AttendanceRecord, AttendanceSession
         from apps.alerts.models import Alert
+        from apps.users.models import Department
+        from apps.marks.models import Mark
+        import datetime
+        import calendar
 
         total_students = Student.objects.filter(is_active=True).count()
         total_faculty = FacultyProfile.objects.filter(user__is_active=True).count()
         total_departments = Department.objects.count()
         active_alerts = Alert.objects.filter(is_resolved=False).count()
 
+        grade_dist = {'A+': 0, 'A': 0, 'B+': 0, 'B': 0, 'C': 0, 'D': 0, 'F': 0}
+        for m in Mark.objects.all():
+            if m.grade in grade_dist:
+                grade_dist[m.grade] += 1
+            else:
+                grade_dist.setdefault(m.grade, 1)
+        
+        marks_dist = [
+            {'grade': 'A+', 'count': grade_dist.get('A+', 0), 'color': '#10b981'},
+            {'grade': 'A', 'count': grade_dist.get('A', 0), 'color': '#3b82f6'},
+            {'grade': 'B+', 'count': grade_dist.get('B+', 0), 'color': '#8b5cf6'},
+            {'grade': 'B', 'count': grade_dist.get('B', 0), 'color': '#f59e0b'},
+            {'grade': 'C', 'count': grade_dist.get('C', 0), 'color': '#f97316'},
+            {'grade': 'F', 'count': grade_dist.get('F', 0), 'color': '#ef4444'},
+        ]
+
+        today = datetime.date.today()
+        attendance_trend = []
+        for i in range(5, -1, -1):
+            month = today.month - i
+            year = today.year
+            while month <= 0:
+                month += 12
+                year -= 1
+            m_name = calendar.month_abbr[month]
+            sessions = AttendanceSession.objects.filter(date__month=month, date__year=year)
+            records = AttendanceRecord.objects.filter(session__in=sessions)
+            total = records.count()
+            present = records.filter(status='PRESENT').count()
+            att_pct = int((present / total * 100)) if total > 0 else 0
+            attendance_trend.append({'month': m_name, 'attendance': att_pct})
+
         return Response({
             'total_students': total_students,
             'total_faculty': total_faculty,
             'total_departments': total_departments,
             'active_alerts': active_alerts,
+            'marks_dist': marks_dist,
+            'attendance_trend': attendance_trend
         })

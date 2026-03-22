@@ -4,19 +4,13 @@ import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
 import { Eye, EyeOff, GraduationCap, Brain, Shield, Users, BarChart3 } from 'lucide-react'
 
-const DEMO_ACCOUNTS = [
-  { role: 'Admin', email: 'admin@edunexus.com', password: 'admin@123', color: 'bg-violet-600' },
-  { role: 'HOD', email: 'hod.it@edunexus.com', password: 'hod@123', color: 'bg-blue-600' },
-  { role: 'Faculty', email: 'faculty1@edunexus.com', password: 'faculty@123', color: 'bg-emerald-600' },
-  { role: 'Student', email: 'student1@edunexus.com', password: 'student@123', color: 'bg-amber-600' },
-]
-
 export default function LoginPage() {
   const { login } = useAuth()
   const navigate = useNavigate()
   const [form, setForm] = useState({ email: '', password: '' })
   const [showPwd, setShowPwd] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [selectedRole, setSelectedRole] = useState('Admin')
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -31,11 +25,6 @@ export default function LoginPage() {
     } finally {
       setLoading(false)
     }
-  }
-
-  const fillDemo = (account) => {
-    setForm({ email: account.email, password: account.password })
-    toast.success(`Demo: ${account.role} credentials filled`)
   }
 
   return (
@@ -102,6 +91,23 @@ export default function LoginPage() {
             <p className="text-slate-500 mt-1">Access your EduNexus dashboard</p>
           </div>
 
+          <div className="flex bg-surface-100 p-1 rounded-xl mb-6">
+            {['Admin', 'HOD', 'Faculty', 'Student'].map(role => (
+              <button
+                key={role}
+                type="button"
+                onClick={() => setSelectedRole(role)}
+                className={`flex-1 py-1.5 text-sm rounded-lg transition-all ${
+                  selectedRole === role
+                    ? 'bg-white text-primary-700 font-bold shadow-sm'
+                    : 'text-slate-500 font-medium hover:text-slate-700'
+                }`}
+              >
+                {role}
+              </button>
+            ))}
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label className="label">Email Address</label>
@@ -149,22 +155,6 @@ export default function LoginPage() {
               ) : 'Sign In'}
             </button>
           </form>
-
-          {/* Demo accounts */}
-          <div className="mt-8">
-            <p className="text-xs text-slate-400 uppercase tracking-wider font-medium mb-3">Quick Demo Access</p>
-            <div className="grid grid-cols-2 gap-2">
-              {DEMO_ACCOUNTS.map(acc => (
-                <button
-                  key={acc.role}
-                  onClick={() => fillDemo(acc)}
-                  className={`${acc.color} text-white text-xs px-3 py-2 rounded-lg font-medium transition-all duration-200 hover:opacity-90 hover:scale-[1.02] active:scale-[0.98]`}
-                >
-                  Login as {acc.role}
-                </button>
-              ))}
-            </div>
-          </div>
 
           <p className="mt-8 text-center text-xs text-slate-400">
             Goel Institute of Technology & Management, Lucknow<br />

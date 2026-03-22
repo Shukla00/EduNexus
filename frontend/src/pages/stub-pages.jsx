@@ -789,6 +789,9 @@ export function ProfilePage() {
 
   const updateProfile = async (e) => {
     e.preventDefault()
+    if (profileForm.phone && !/^\d{10}$/.test(profileForm.phone)) {
+      return toast.error('Mobile number must be exactly 10 digits')
+    }
     setLoading(true)
     try {
       await authApi.updateMe(profileForm)
@@ -803,14 +806,19 @@ export function ProfilePage() {
 
   const changePassword = async (e) => {
     e.preventDefault()
-    if (passwordForm.new_password !== passwordForm.confirm_password) {
-      return toast.error('New passwords do not match')
-    }
+    const pwd = passwordForm.new_password
+    if (pwd.length < 8) return toast.error('Password must be at least 8 characters long')
+    if (!/[A-Z]/.test(pwd)) return toast.error('Password must contain at least one uppercase letter')
+    if (!/\d/.test(pwd)) return toast.error('Password must contain at least one number')
+    if (!/[^A-Za-z0-9]/.test(pwd)) return toast.error('Password must contain at least one special character')
+    if (pwd !== passwordForm.confirm_password) return toast.error('New passwords do not match')
+
     setLoading(true)
     try {
       await authApi.changePassword({ 
         old_password: passwordForm.old_password, 
-        new_password: passwordForm.new_password 
+        new_password: passwordForm.new_password,
+        confirm_password: passwordForm.confirm_password
       })
       toast.success('Password changed successfully')
       setPasswordForm({ old_password: '', new_password: '', confirm_password: '' })
@@ -861,7 +869,7 @@ export function ProfilePage() {
             </div>
             <div>
               <label className="label">Phone Number</label>
-              <input className="input focus:ring-primary-500 transition-all" placeholder="Enter phone..." value={profileForm.phone} onChange={e => setProfileForm(p => ({ ...p, phone: e.target.value }))} />
+              <input type="tel" pattern="\d{10}" title="Must be exactly 10 digits" className="input focus:ring-primary-500 transition-all" placeholder="Enter 10-digit phone..." value={profileForm.phone} onChange={e => setProfileForm(p => ({ ...p, phone: e.target.value }))} />
             </div>
             <button type="submit" className="btn-primary w-full mt-2" disabled={loading}>
               Save Profile Changes
@@ -887,11 +895,11 @@ export function ProfilePage() {
               <label className="label flex justify-between">
                 New Password
               </label>
-              <input type="password" required className="input bg-white" minLength="6" placeholder="••••••••" value={passwordForm.new_password} onChange={e => setPasswordForm(p => ({ ...p, new_password: e.target.value }))} />
+              <input type="password" required className="input bg-white" minLength="8" placeholder="••••••••" value={passwordForm.new_password} onChange={e => setPasswordForm(p => ({ ...p, new_password: e.target.value }))} />
             </div>
             <div>
               <label className="label">Confirm New Password</label>
-              <input type="password" required className="input bg-white" minLength="6" placeholder="••••••••" value={passwordForm.confirm_password} onChange={e => setPasswordForm(p => ({ ...p, confirm_password: e.target.value }))} />
+              <input type="password" required className="input bg-white" minLength="8" placeholder="••••••••" value={passwordForm.confirm_password} onChange={e => setPasswordForm(p => ({ ...p, confirm_password: e.target.value }))} />
             </div>
             <div className="mt-auto pt-4">
               <button type="submit" className="btn-secondary w-full border-indigo-200 text-indigo-700 hover:bg-indigo-50 hover:border-indigo-300" disabled={loading}>

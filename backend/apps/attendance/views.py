@@ -18,6 +18,7 @@ class AttendanceRecordSerializer(serializers.ModelSerializer):
 class AttendanceSessionSerializer(serializers.ModelSerializer):
     course_name = serializers.CharField(source='course.name', read_only=True)
     course_code = serializers.CharField(source='course.code', read_only=True)
+    faculty = serializers.PrimaryKeyRelatedField(read_only=True)
     faculty_name = serializers.CharField(source='faculty.get_full_name', read_only=True)
     records = AttendanceRecordSerializer(many=True, read_only=True)
     attendance_rate = serializers.SerializerMethodField()
@@ -36,6 +37,10 @@ class AttendanceSessionSerializer(serializers.ModelSerializer):
             return 0
         present = records.filter(status='PRESENT').count()
         return round((present / records.count()) * 100, 1)
+
+    def create(self, validated_data):
+        validated_data['faculty'] = self.context['request'].user
+        return super().create(validated_data)
 
 
 class BulkAttendanceSerializer(serializers.Serializer):
@@ -172,3 +177,50 @@ class AttendanceStatsView(APIView):
             'average_attendance': round(avg.get('avg_pct') or 0, 2),
             'low_attendance_count': low_attendance,
         })
+
+
+class AttendanceOCRView(APIView):
+    def post(self, request):
+        import os
+        import cv2
+        import pytesseract
+        import re
+        from django.core.files.storage import FileSystemStorage
+
+        # Configure Tesseract path for Windows
+        pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+
+        if 'file' not in request.FILES:
+            return Response({'error': 'No file uploaded.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        upload = request.FILES['file']
+        fs = FileSystemStorage()
+        filename = fs.save(upload.name, upload)
+        file_path = fs.path(filename)
+
+        try:
+            img = cv2.imread(file_path)
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY)
+            
+            custom_config = r'--oem 3 --psm 6'
+            extracted_text = pytesseract.image_to_string(thresh, config=custom_config)
+            
+            raw_tokens = re.split(r'\s+', extracted_text)
+            
+            enrollments = []
+            for t in raw_tokens:
+                clean_t = re.sub(r'[^a-zA-Z0-9]', '', t)
+                # Heuristic: looks like an enrollment number if it contains digits
+                if len(clean_t) >= 2 and any(c.isdigit() for c in clean_t):
+                    enrollments.append(clean_t)
+            
+            return Response({
+                'detected_enrollments': list(set(enrollments)),
+                'raw_text': extracted_text
+            })
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        finally:
+            if os.path.exists(file_path):
+                os.remove(file_path)

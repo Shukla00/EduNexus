@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { departmentsApi } from '../../services/api'
 import { Plus, Search, Trash2, Edit } from 'lucide-react'
+import ConfirmModal from '../../components/ConfirmModal'
 import toast from 'react-hot-toast'
 
 export default function ManageDepartments() {
@@ -8,8 +9,27 @@ export default function ManageDepartments() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [showAddModal, setShowAddModal] = useState(false)
-  const [form, setForm] = useState({ name: '', code: '', description: '' })
+  const [editingId, setEditingId] = useState(null)
+  const defaultForm = { name: '', code: '', description: '' }
+  const [form, setForm] = useState(defaultForm)
   const [submitting, setSubmitting] = useState(false)
+  const [deleteId, setDeleteId] = useState(null)
+
+  const openAdd = () => {
+    setEditingId(null)
+    setForm(defaultForm)
+    setShowAddModal(true)
+  }
+
+  const openEdit = (d) => {
+    setEditingId(d.id)
+    setForm({
+      name: d.name || '',
+      code: d.code || '',
+      description: d.description || ''
+    })
+    setShowAddModal(true)
+  }
 
   const load = async () => {
     setLoading(true)
@@ -30,31 +50,37 @@ export default function ManageDepartments() {
     d.code.toLowerCase().includes(search.toLowerCase())
   )
 
-  const addDepartment = async (e) => {
+  const saveDepartment = async (e) => {
     e.preventDefault()
     setSubmitting(true)
     try {
-      await departmentsApi.create(form)
-      toast.success('Department added successfully')
+      if (editingId) {
+        await departmentsApi.update(editingId, form)
+        toast.success('Department updated successfully')
+      } else {
+        await departmentsApi.create(form)
+        toast.success('Department added successfully')
+      }
       setShowAddModal(false)
-      setForm({ name: '', code: '', description: '' })
       load()
     } catch (err) {
-      const msg = Object.values(err?.response?.data || {}).flat()[0] || 'Failed to add department'
+      const msg = Object.values(err?.response?.data || {}).flat()[0] || 'Failed to save department'
       toast.error(msg)
     } finally {
       setSubmitting(false)
     }
   }
 
-  const deleteDepartment = async (id) => {
-    if (!confirm('Delete this department? All associated users and courses may be affected.')) return
+  const deleteDepartment = async () => {
+    if (!deleteId) return
     try {
-      await departmentsApi.delete(id)
+      await departmentsApi.delete(deleteId)
       toast.success('Department deleted')
       load()
     } catch {
       toast.error('Failed to delete department')
+    } finally {
+      setDeleteId(null)
     }
   }
 
@@ -65,7 +91,7 @@ export default function ManageDepartments() {
           <h1 className="page-title">Manage Departments</h1>
           <p className="page-subtitle">{departments.length} departments available</p>
         </div>
-        <button className="btn-primary" onClick={() => setShowAddModal(true)}>
+        <button className="btn-primary" onClick={openAdd}>
           <Plus className="w-4 h-4" /> Add Department
         </button>
       </div>
@@ -99,8 +125,8 @@ export default function ManageDepartments() {
                   {d.code}
                 </div>
                 <div className="flex gap-1">
-                  <button className="btn-ghost btn-sm p-1.5" title="Edit"><Edit className="w-4 h-4" /></button>
-                  <button onClick={() => deleteDepartment(d.id)} className="btn-ghost btn-sm p-1.5 text-red-500 hover:bg-red-50" title="Delete">
+                  <button onClick={() => openEdit(d)} className="btn-ghost btn-sm p-1.5" title="Edit"><Edit className="w-4 h-4" /></button>
+                  <button onClick={() => setDeleteId(d.id)} className="btn-ghost btn-sm p-1.5 text-red-500 hover:bg-red-50" title="Delete">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
@@ -116,9 +142,9 @@ export default function ManageDepartments() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-slide-up">
             <div className="p-6 border-b border-surface-100">
-              <h2 className="text-xl font-bold font-display text-slate-900">Add Department</h2>
+              <h2 className="text-xl font-bold font-display text-slate-900">{editingId ? 'Edit Department' : 'Add Department'}</h2>
             </div>
-            <form onSubmit={addDepartment} className="p-6 space-y-4">
+            <form onSubmit={saveDepartment} className="p-6 space-y-4">
               <div>
                 <label className="label">Department Name</label>
                 <input className="input" required value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Information Technology" />
@@ -134,13 +160,20 @@ export default function ManageDepartments() {
               <div className="flex gap-3 pt-2">
                 <button type="button" className="btn-secondary flex-1" onClick={() => setShowAddModal(false)}>Cancel</button>
                 <button type="submit" className="btn-primary flex-1" disabled={submitting}>
-                  {submitting ? 'Adding...' : 'Add Department'}
+                  {submitting ? 'Saving...' : (editingId ? 'Save Changes' : 'Add Department')}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+      <ConfirmModal
+        isOpen={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        onConfirm={deleteDepartment}
+        title="Delete Department"
+        message="Are you sure you want to delete this department? All associated users and courses may be affected."
+      />
     </div>
   )
 }

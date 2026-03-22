@@ -3,6 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from .models import Student, Course, AcademicYear
 from apps.users.serializers import UserSerializer
+from apps.faculty.models import FacultyProfile
 
 
 class AcademicYearSerializer(serializers.ModelSerializer):
@@ -13,10 +14,43 @@ class AcademicYearSerializer(serializers.ModelSerializer):
 
 class CourseSerializer(serializers.ModelSerializer):
     department_name = serializers.CharField(source='department.name', read_only=True)
+    faculty = serializers.PrimaryKeyRelatedField(
+        queryset=FacultyProfile.objects.all(), write_only=True, required=False, allow_null=True
+    )
+    faculty_name = serializers.SerializerMethodField()
+    faculty_id = serializers.SerializerMethodField()
 
     class Meta:
         model = Course
-        fields = ['id', 'name', 'code', 'department', 'department_name', 'credits', 'semester', 'description']
+        fields = ['id', 'name', 'code', 'department', 'department_name', 'credits', 'semester', 'description', 'faculty', 'faculty_name', 'faculty_id']
+
+    def get_faculty_name(self, obj):
+        faculty = obj.facultyprofile_set.first()
+        return faculty.user.get_full_name() if faculty else None
+
+    def get_faculty_id(self, obj):
+        faculty = obj.facultyprofile_set.first()
+        return faculty.id if faculty else None
+
+    def create(self, validated_data):
+        faculty = validated_data.pop('faculty', None)
+        course = super().create(validated_data)
+        if faculty:
+            faculty.courses_assigned.add(course)
+        return course
+
+    def update(self, instance, validated_data):
+        faculty_provided = 'faculty' in self.initial_data
+        faculty = validated_data.pop('faculty', None)
+        course = super().update(instance, validated_data)
+        
+        if faculty_provided:
+            # Remove from all current faculties
+            instance.facultyprofile_set.clear()
+            if faculty:
+                faculty.courses_assigned.add(instance)
+        
+        return course
 
 
 class StudentSerializer(serializers.ModelSerializer):
@@ -48,7 +82,7 @@ class StudentCreateSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(write_only=True)
     first_name = serializers.CharField(write_only=True)
     last_name = serializers.CharField(write_only=True)
-    password = serializers.CharField(write_only=True, default='edunexus@123')
+    password = serializers.CharField(write_only=True, default='Student@123')
 
     class Meta:
         model = Student
@@ -63,7 +97,7 @@ class StudentCreateSerializer(serializers.ModelSerializer):
         email = validated_data.pop('email')
         first_name = validated_data.pop('first_name')
         last_name = validated_data.pop('last_name')
-        password = validated_data.pop('password', 'edunexus@123')
+        password = validated_data.pop('password', 'Student@123')
 
         user = User.objects.create_user(
             email=email, first_name=first_name, last_name=last_name,
