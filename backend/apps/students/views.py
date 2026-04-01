@@ -17,12 +17,15 @@ class StudentListCreateView(generics.ListCreateAPIView):
         qs = super().get_queryset()
         dept = self.request.query_params.get('department')
         semester = self.request.query_params.get('semester')
+        course = self.request.query_params.get('course')
         risk = self.request.query_params.get('risk_level')
         search = self.request.query_params.get('search')
         if dept:
             qs = qs.filter(department_id=dept)
         if semester:
             qs = qs.filter(semester=semester)
+        if course:
+            qs = qs.filter(courses__id=course)
         if risk:
             qs = qs.filter(ai_risk_level=risk)
         if search:
