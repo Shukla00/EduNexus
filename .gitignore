@@ -1,0 +1,22 @@
+# VS Code
+.vscode/
+
+# Python Virtual Environment
+venv/
+
+# Environment Variables
+backend/.env
+frontend/.env
+
+# Node Modules
+frontend/node_modules/
+
+# AI/RAG Files
+backend/chunks.pkl
+backend/vector.index
+backend/media/
+
+# Python Cache
+__pycache__/
+*.pyc
+
