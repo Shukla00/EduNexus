@@ -20,3 +20,15 @@ backend/media/
 __pycache__/
 *.pyc
 
+# Database
+*.sqlite3
+
+# ML Models
+*.pkl
+
+# PDFs uploaded by admin
+backend/apps/ai/documents/
+
+
+# Media
+backend/media/
