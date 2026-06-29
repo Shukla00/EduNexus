@@ -7,8 +7,23 @@ from pathlib import Path
 from datetime import timedelta
 
 from decouple import config, Csv
+from dotenv import load_dotenv
+load_dotenv()
+
+from decouple import config
+import dj_database_url
+
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+DATABASES = {
+    "default": dj_database_url.config(
+        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}"
+    )
+}
+
+
 
 SECRET_KEY = config('SECRET_KEY')
 
@@ -21,6 +36,7 @@ def cast_debug(value):
     if normalized in {'false', '0', 'no', 'off', 'release', 'production', 'prod'}:
         return False
     raise ValueError(f'Invalid DEBUG value: {value}')
+
 
 
 DEBUG = config('DEBUG', default=False, cast=cast_debug)
@@ -60,10 +76,10 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
 ]
 
 ROOT_URLCONF = 'edunexus.urls'
-
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -82,14 +98,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'edunexus.wsgi.application'
 
-# Database
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
-
 # Custom User Model
 AUTH_USER_MODEL = 'users.User'
 
@@ -107,8 +115,27 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+if DEBUG:
+    STORAGES = {
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        },
+    }
+else:
+    STORAGES = {
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        },
+    }
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -151,3 +178,6 @@ AI_MARKS_THRESHOLD = 40       # percentage
 AI_ALERT_COOLDOWN_DAYS = 7    # days between repeated alerts
 AI_MODEL_NAME = 'Meta-Llama-3.1-8B-Instruct-Q5_K_M.gguf'
 AI_MODEL_PATH = BASE_DIR / 'apps' / 'ai' / 'models'
+
+
+

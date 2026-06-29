@@ -32,3 +32,5 @@ backend/apps/ai/documents/
 
 # Media
 backend/media/
+backend/staticfiles/
+staticfiles/
